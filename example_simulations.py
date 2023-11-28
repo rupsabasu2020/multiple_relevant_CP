@@ -9,9 +9,11 @@ plt.rcParams["axes.grid"] = True
 np.set_printoptions(threshold=np.inf)  # <-- displays all elements of the array
 decimal.getcontext().prec = 10
 
-# ISSUES::: Fix method of choosing binseg_thresh
-# Fix code for running simulations
-# update for generated data from bfmcpp... !! needs changing of the Change_point_test for no values of block-length and binseg_thresh
+# ISSUES:::
+# 
+# (1) Fix method of choosing binseg_thresh
+# (2) Fix code for running simulations
+# (3) update for generated data from bfmcpp... !! needs changing of the Change_point_test for no values of block-length and binseg_thresh
 
 
 
