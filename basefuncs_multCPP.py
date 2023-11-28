@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import fMA_1_base as fMA1
 
 # ---- FINAL VERSION OF REQUIRED BASE FUNCTIONS ----------------#
 
@@ -214,7 +215,7 @@ def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
 
 
 
-def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binseg_thresh, l,  M = 2):
+def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binseg_thresh= None, block_length_boot= None,  M = 2):
     """
     Test procedure for multiple changes
 
@@ -223,7 +224,12 @@ def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binse
         --
         --
     """
-    
+    # Calculate or use user-defined binseg_thresh
+    if binseg_thresh is None:
+        binseg_thresh = calculate_median_l2_norm_squared(data_mat)
+    if block_length_boot is None:
+        block_length_boot = w_funcs_q(h_val = 9, timeseries=data_mat, weight_function='qs')
+
     N = len(data_mat[:,0])     # number of samples of functional data 
     T_star = []
     mu_diff = mean_funcs(data_mat, change_points) #  mean difference before and after change locations
@@ -231,7 +237,7 @@ def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binse
     E_upper, E_lower, _ = extremal_points(mu_diff, const_c, N, test_stat, change_points)  # E_plus and E_minus (the extremal points)
     for _ in range(repeats): 
         data_mat_copy = np.copy(data_mat)
-        T_st, n_i, s_Tilde= bootstrap_func(data_mat_copy, change_points, mu_diff, E_upper, E_lower, l, M)
+        T_st, n_i, s_Tilde= bootstrap_func(data_mat_copy, change_points, mu_diff, E_upper, E_lower, block_length_boot, M)
         T_star.append(T_st)   #value of bootstrap samples
 
     quantile = np.quantile(np.asarray(T_star), 1-level_alpha)
@@ -257,7 +263,106 @@ def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binse
 # ----------- Not required if block-length l is known ----------------------------------------------#
 
 
+def bartlett_window(window_length= 21):
+    if window_length % 2 == 0:
+        raise ValueError("Window length should be odd for Bartlett window")
+    return np.bartlett(window_length)
 
+def parzen_window(window_length= 21):
+    if window_length % 2 == 0:
+        raise ValueError("Window length should be odd for Parzen window")
+    parzen_window = np.zeros(window_length)
+    half_width = window_length // 2
+    for n in range(half_width):
+        parzen_window[half_width - n] = 1 - 6 * (n / half_width) ** 2 + 6 * (n / half_width) ** 3
+        parzen_window[half_width + n] = 2 * (1 - n / half_width) ** 3
+    return parzen_window
+
+def tukey_hanning_window(window_length= 21):
+    tukey_hanning = np.zeros(window_length)
+    center = (window_length - 1) / 2
+    x = np.linspace(-center, center, window_length)
+
+    # Define the Tukey-Hanning window as (1 + cos(πx)) / 2 for |x| ≤ 1 and 0 otherwise
+    tukey_hanning[np.abs(x) <= 1] = 0.5 * (1 + np.cos(np.pi * x[np.abs(x) <= 1]))
+
+    return tukey_hanning
+
+def quadratic_spectral_weight(window_length =21):
+    if window_length < 3:
+        raise ValueError("Window length should be at least 3 for the quadratic spectral weight function")
+    quadratic_weight = np.zeros(window_length)
+    center = (window_length - 1) / 2
+    x = np.linspace(-center, center, window_length)
+    for i in range(len(x)):
+        if x[i] == 0:
+            quadratic_weight[i] = 0
+        else:
+            quadratic_weight[i] = (25 / (12 * np.pi**2 * x[i]**2)) * (np.sin(6 * np.pi * x[i] / 5) / (6 * np.pi * x[i] / 5) - np.cos(6 * np.pi * x[i] / 5))
+
+    return quadratic_weight
+
+
+
+
+
+
+# mean squared error... for selection of bandwidth of the bootstrap
+
+def weighted_corr(h_val, data, weights):
+    """gives estimate of covariance, denoted by C_hat"""
+    weighted_corrs = []
+    data_centered = data-np.mean(data, axis = 0)
+    for l in range(1, h_val):
+        gamma_l = np.matmul(data_centered[:, :-l-1], data_centered[:, l+1:].T)
+        K = weights[l] * gamma_l
+        weighted_corrs.append(K)
+    w_corrs = np.asarray(weighted_corrs)
+    summing_l = np.sum(w_corrs, axis = 0) # summing over l
+    return summing_l
+
+
+def compute_c_0(w_corrs, weight_func, q, N):
+    norm_Chat_1st = (q*(np.linalg.norm(w_corrs))**2)**(1/(1+2*q))
+    norm_Chat_2te =  ((np.linalg.norm(w_corrs)**2 + np.trace(w_corrs)**2) * np.linalg.norm(weight_func)**2)**(-1/(1+2*q))
+    c_0 = norm_Chat_1st*norm_Chat_2te
+    opt_h = c_0*(N**(1/(1+2*q)))
+    return opt_h
+
+
+
+
+def w_funcs_q(h_val, timeseries, weight_function='qs'):
+    """
+    Optimal bandwidth with respect to different weight functions
+
+    Parameters:
+    - h_val: Bandwidth parameter
+    - timeseries: Time series data
+    - runs: Number of runs
+    - weight_function: Choice of weight function ('bartlett', 'parzon', 'tukey', 'qs')
+
+    Returns:
+    Optimal bandwidth for the specified weight function
+    """
+    if weight_function == 'bartlett':
+        bartlett_weights = bartlett_window(h_val)
+        bartlett_estC = weighted_corr(h_val, timeseries.T, bartlett_weights)
+        return compute_c_0(bartlett_estC, bartlett_weights, 1, len(timeseries[:, 0]))
+    elif weight_function == 'parzon':
+        parzon_weights = parzen_window(h_val)
+        parzon_estC = weighted_corr(h_val, timeseries.T, parzon_weights)
+        return compute_c_0(parzon_estC, parzon_weights, 2, len(timeseries[:, 0]))
+    elif weight_function == 'tukey':
+        tukey_weights = tukey_hanning_window(h_val)
+        tukey_estC = weighted_corr(h_val, timeseries.T, tukey_weights)
+        return compute_c_0(tukey_estC, tukey_weights, 2, len(timeseries[:, 0]))
+    elif weight_function == 'qs':
+        qs_weights = quadratic_spectral_weight(h_val)
+        qs_estC = weighted_corr(h_val, timeseries.T, qs_weights)
+        return compute_c_0(qs_estC, qs_weights, 2, len(timeseries[:, 0]))
+    else:
+        raise ValueError("Invalid weight function. Choose from 'bartlett', 'parzon', 'tukey', 'qs'.")
 
 
 
@@ -272,3 +377,37 @@ def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binse
 
 
 
+def calculate_squared_l2_norm(data):
+    differences = np.diff(data, axis=0)
+    squared_l2_norms = np.sum(differences**2, axis=0)#/2
+    return squared_l2_norms
+
+def calculate_median_l2_norm_squared(data):
+    squared_l2_norms = calculate_squared_l2_norm(data)
+    sigma_n_2 = np.median(squared_l2_norms)
+    sigma_n = sigma_n_2#**(1/2)
+    return sigma_n
+
+#---------------------------------------------------------------------------------------------------#
+#-               Ancillary functions III: generate data for testing the method                     -#
+#---------------------------------------------------------------------------------------------------#
+# ----------- Not required if other choice of data is to be generated ------------------------------#
+# we generate fMA1 data here as this fulfills assumptions in our paper 
+
+
+
+def gen_data(num_curves, change_locs, time_points):
+    #np.random.seed(seed_val)
+    errors_eta = fMA1.fMA1(num_curves)
+    #----------------generate data----------------------------------#
+    sine_curves = np.sin(time_points) + np.cos(time_points)
+    noisy_curves = 20*sine_curves + errors_eta   #+ noise
+
+    #mean_curve = np.mean(noisy_curves, axis= 0)
+    #---------------add change point to data -----------------------#
+    for idx in change_locs:
+        if len(change_locs) <= 2:
+            noisy_curves[idx:, 0:16] +=   [2, 5, 9, 10,  12, 15, 22, 25, 25, 22, 15, 12, 10, 9, 5, 2] #continuous constant to simulate change 
+        elif len(change_locs) > 2 and idx >= change_locs[2]:
+            noisy_curves[idx:, 0:16] -= [2, 5, 9, 10, 12, 15, 22, 25, 25, 22, 15, 12, 10, 9, 5, 2]
+    return noisy_curves

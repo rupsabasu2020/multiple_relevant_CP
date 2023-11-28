@@ -9,6 +9,12 @@ plt.rcParams["axes.grid"] = True
 np.set_printoptions(threshold=np.inf)  # <-- displays all elements of the array
 decimal.getcontext().prec = 10
 
+# ISSUES::: Fix method of choosing binseg_thresh
+# Fix code for running simulations
+# update for generated data from bfmcpp... !! needs changing of the Change_point_test for no values of block-length and binseg_thresh
+
+
+
 
 #---------------------------------------------------------------------------------------------------#
 #-                        Easy example for single run of simulation                                -#
@@ -23,7 +29,7 @@ rel_size = [20]
 alpha = 0.1    # parameter, level of the test
 bootrepeats = 100
 
-def change_point_Test(run, num_curves, time_points, change_locs, bin_seg_thresh, delta_size, alpha, boot_repeats, block_length, c_value= 0.001):
+def change_point_Test(run, num_curves, time_points, change_locs,  delta_size, alpha, boot_repeats, block_length= None, bin_seg_thresh= None, c_value= 0.001):
     """
     function to run simulations for the methodology 
     --
@@ -40,7 +46,14 @@ def change_point_Test(run, num_curves, time_points, change_locs, bin_seg_thresh,
     for idx in change_locs:
 
         noisy_curves[idx:, 0:16] +=   [2, 5, 9, 10,  12, 15, 25, 25, 25, 22, 15, 12, 10, 9, 5, 2] #continuous constant to simulate change 
+
     #------------ binary segmentation ------------------------------#
+    
+    if bin_seg_thresh is None:
+        bin_seg_thresh = bfmcpp.calculate_median_l2_norm_squared(noisy_curves)
+    if block_length is None:
+        block_length = bfmcpp.w_funcs_q(h_val = 9, timeseries=noisy_curves, weight_function='qs')
+
     binseg_cp  = bfmcpp.binary_seg_init(noisy_curves, bin_seg_thresh)  # not using at all
 #    print(binseg_cp)
     #------------- change point test -------------------------------#
@@ -49,7 +62,7 @@ def change_point_Test(run, num_curves, time_points, change_locs, bin_seg_thresh,
 
 
 
-binsegChanges, _ = change_point_Test(1, num_curves, time_points, true_cp, binseg_thresh, rel_size, alpha, boot_repeats=100, block_length=9)
+binsegChanges, _ = change_point_Test(1, num_curves, time_points, true_cp, rel_size, alpha, boot_repeats=100, block_length=9)
 
 
 
