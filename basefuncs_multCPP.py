@@ -1,10 +1,11 @@
 import numpy as np
 import random
-from scipy.linalg import eigh
+
+# ---- FINAL VERSION OF REQUIRED BASE FUNCTIONS ----------------#
 
 
 #---------------------------------------------------------------------------------------------------#
-#-                           Initial binary segmentation                                           -#
+#--                           Initial binary segmentation                                         --#
 #---------------------------------------------------------------------------------------------------#
 
 def U_hat(s, fdata, l, r, N):
@@ -47,10 +48,11 @@ def cusum(data_mat, begin, end, N, thresh_val):  #, thresh_val, cp_list,
     if np.max(M_hat) > thresh_val:   # binseg thresh for detecting
 
         pos = np.argmax(M_hat)
+    
     if pos > 0: 
-        return pos + begin 
+        return pos + begin, M_hat[pos] 
     else: 
-        return pos #sorted(cp_list), M_hat[pos]
+        return pos, M_hat[pos] #sorted(cp_list)
 
 
 
@@ -61,14 +63,14 @@ def binary_seg_init(data, thresh):
     """Binary segmentation for change-point detection."""
     N = len(data[:, 0])
     cp = [0, N]  # Initial interval
-#    cp2 = [0, N]
     return binary_seg_rec(data, thresh, cp, 0, N, N)
 
 
 def binary_seg_rec(data, thresh, cp, begin, end, N):
-    cp_location = cusum(data, begin, end, N, thresh)
+    cp_location, _ = cusum(data, begin, end, N, thresh)
     if cp_location > 0:
         cp.append(cp_location)
+        print(cp_location)
         cp.sort()
         cp = binary_seg_rec(data, thresh, cp, begin, cp_location - 1, N)
         cp = binary_seg_rec(data, thresh, cp, cp_location + 1, end, N)
@@ -80,7 +82,11 @@ def binary_seg_rec(data, thresh, cp, begin, end, N):
 
 def mult_test_stat(list_of_cp, fdata, binseg_thresh):
     """
-
+    compute test statistic for each change point:
+        --
+        --
+        --
+        --
     """
     test_stat_i = {}
     cp_i = list_of_cp[1:-1]
@@ -88,38 +94,49 @@ def mult_test_stat(list_of_cp, fdata, binseg_thresh):
         prev_cp= list_of_cp[list_of_cp.index(cp_i[each_cp])-1]
         next_cp = list_of_cp[list_of_cp.index(cp_i[each_cp])+1]
         datamatrix = fdata[ prev_cp: next_cp]    #takes care of calculating the statistic between prev. and next. change points
-        _, test_stat_i[str(cp_i[each_cp])] = cusum(datamatrix, binseg_thresh, [])
+        N = len(datamatrix[:, 0])
+        _, test_stat_i[str(cp_i[each_cp])] = cusum(datamatrix, begin=0, end=N, N=N, thresh_val=binseg_thresh)   # value of the test statistic at the supremum
     return test_stat_i
 
 def mean_funcs(func_data, est_changepoint):
-    # useful for computing extremal sets
+    """
+    compute differences in mean before and after change
+        --
+        --
+        --
+        --
+    """
     mu_diff = []
-    cp_consideration = est_changepoint[1:-1]
+    cp_consideration = est_changepoint[1:-1]   # removing end points i.e., 0 and n
     for cp in cp_consideration:
-        cp_m1 = est_changepoint[est_changepoint.index(cp)-1]
-        cp_p1 = est_changepoint[est_changepoint.index(cp)+1]
-        fdata1 = func_data[cp_m1: cp-cp_m1, :]
-        fdata2 = func_data[cp-cp_m1:cp_p1, :]          # select data before/after change-point
-        mu1_hat = np.mean(fdata1, axis = 0)
-        mu2_hat = np.mean(fdata2, axis = 0)
-        deviation_mu = mu2_hat- mu1_hat
-        mu_diff.append(deviation_mu)
+        cp_m1 = est_changepoint[est_changepoint.index(cp)-1]  #prev cp
+        cp_p1 = est_changepoint[est_changepoint.index(cp)+1]  #next cp
+        fdata1 = func_data[cp_m1: cp-cp_m1, :]                #data from previous until cp
+        fdata2 = func_data[cp-cp_m1:cp_p1, :]          # data from cp until next cp
+        mu1_hat = np.mean(fdata1, axis = 0)            # mean curve prior segment
+        mu2_hat = np.mean(fdata2, axis = 0)            # mean curve next segment             
+        deviation_mu = mu2_hat- mu1_hat                # difference in mean
+        mu_diff.append(deviation_mu)                   # appending to list for multiple CP
     return mu_diff
 
 def extremal_points(mu_diff, c, n, M_hat, est_cp):
-    """ within curves """
-    c_thresh = c*np.log(n)
+    """
+    Extremal points within the curves
+        --
+        --
+        --
+        --
+    """
+    c_thresh = c*np.log(n)          # within RHS of extremal points definition
     E_upper = []
     E_lower = []
     d_hat = []   # store d_hat corresponding to each CP.
-    sValues = np.linspace(0, n, num = n)
-    sValues = sValues/n             # s_hat has to be in (0,1)
+
     for cp in range(1,len(est_cp)-1):
-        statistic = M_hat[str(est_cp[cp])]   # M_(n,i)
-        d_hat_i = statistic
-        upper_thresh = d_hat_i - c_thresh/np.sqrt(n)
-        lower_thresh = - d_hat_i + c_thresh/np.sqrt(n)
-        E_plus = np.argwhere(mu_diff[cp-1] >= upper_thresh)      # arguments which are extremal points
+        d_hat_i = M_hat[str(est_cp[cp])]   # Test statistic corresponding to CP
+        upper_thresh = d_hat_i - c_thresh/np.sqrt(n)  # RHS E_plus
+        lower_thresh = - d_hat_i + c_thresh/np.sqrt(n) # RHS E_minus
+        E_plus = np.argwhere(mu_diff[cp-1] >= upper_thresh)     # arguments which are extremal points
         E_minus = np.argwhere(mu_diff[cp-1] <= lower_thresh)    # arguments where the difference is  significant
         E_upper.append(E_plus), E_lower.append(E_minus)
         d_hat.append(d_hat_i)
@@ -128,18 +145,17 @@ def extremal_points(mu_diff, c, n, M_hat, est_cp):
 
 def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
     """
-    #----function for estimate quantiles  of eq. 4.14 by generating T_n of eq. 4.20
-    #----note that in this function the data matrix is transformed after the est. change-point
-    # -- n1: estimated change-point.
-
-    #--- some previous code might not run because of not being provided with the arg l 
+    Bootstrapping the threshold quantiles
+        --
+        --
+        --
+        --
     """
     N = len(func_data[:, 0])
-    #l = int(N**(1/4))    #remove this from the arguments of functions...
     T_max = []
     ni = []
     s_tild_hat = []
-    sValues = np.linspace(0, N, num = N)/N
+    sValues = np.linspace(0, 1, num = N)
     for i in range(1, len(est_cp)-1): 
         cp = est_cp[i]
         cp_m1= est_cp[i-1]
@@ -191,23 +207,28 @@ def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
 
 
 
-
+#---------------------------------------------------------------------------------------------------#
+#-                           Step 2 (continued): Relevant change points, decision function         -#
+#---------------------------------------------------------------------------------------------------#
 
 
 
 
 def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binseg_thresh, l,  M = 2):
     """
-    ---- WORK: Normally give test_dec.. 
-    ---- If asked:: give rej.. (f)
-    
-    """
+    Test procedure for multiple changes
 
-    N = len(data_mat[:,0])     # number of functional data 
+        --
+        --
+        --
+        --
+    """
+    
+    N = len(data_mat[:,0])     # number of samples of functional data 
     T_star = []
-    mu_diff = mean_funcs(data_mat, change_points) # list of mu_diffs
-    test_stat =  mult_test_stat(change_points, data_mat, binseg_thresh)
-    E_upper, E_lower, _ = extremal_points(mu_diff, const_c, N, test_stat, change_points)
+    mu_diff = mean_funcs(data_mat, change_points) #  mean difference before and after change locations
+    test_stat =  mult_test_stat(change_points, data_mat, binseg_thresh)   # Test statistic at each change location
+    E_upper, E_lower, _ = extremal_points(mu_diff, const_c, N, test_stat, change_points)  # E_plus and E_minus (the extremal points)
     for _ in range(repeats): 
         data_mat_copy = np.copy(data_mat)
         T_st, n_i, s_Tilde= bootstrap_func(data_mat_copy, change_points, mu_diff, E_upper, E_lower, l, M)
@@ -225,40 +246,29 @@ def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binse
         rej = (rhs>= quantile)
         rej = rej*1
         test_dec[str(delta)] = global_rej
-    return rej  #test_dec #rej, global_rej# , vars_boots   
+    return test_dec, rej
+
+
+
+
+#---------------------------------------------------------------------------------------------------#
+#-               Ancillary functions I: choice of block-length for the bootstrap                   -#
+#---------------------------------------------------------------------------------------------------#
+# ----------- Not required if block-length l is known ----------------------------------------------#
 
 
 
 
 
-def change_point_Test(run, num_curves, time_points, change_locs, bin_seg_thresh, delta_size, alpha, boot_repeats, block_length, c_value= 0.001):
-    """
-    #---- REQUIRED ONLY FOR SIMULATIONS... remove for others... 
-    #---- Rewrite for REAL DATA
-    #------(1) generates synthetic data and detects change points by binary segmentation followed by testing for the detected change points
-    #----- (2) runs only for multiprocessing stuff
-    """
-    #---- add after seed---#
-    # for multiple runs add # np.random.seed(seed_val) and set seed_val as the index of run
 
-    
-    #seed_val = np.random.seed(run)
-    errors_eta = fMA1(num_curves)
-    #----------------generate data----------------------------------#
-    sine_curves = np.sin(time_points) + np.cos(time_points) 
-    noisy_curves = 9.126*sine_curves  + errors_eta #+ noise
-    #mean_curve = np.mean(noisy_curves, axis= 0)
-    #---------------add change point to data -----------------------#
-    for idx in change_locs:
 
-        noisy_curves[idx:, 0:16] +=   [2, 5, 9, 10,  12, 15, 25, 25, 25, 22, 15, 12, 10, 9, 5, 2] #continuous constant to simulate change 
-    #------------ binary segmentation ------------------------------#
-    binseg_cp, _ = binary_seg_init(noisy_curves, bin_seg_thresh)  # not using at all
 
-    #------------- change point test -------------------------------#
-    test_decisions = reject(noisy_curves, binseg_cp, Delta= delta_size, level_alpha=alpha, repeats=boot_repeats, const_c = c_value , binseg_thresh=bin_seg_thresh, l= block_length)
-    
-    
-    return  binseg_cp, test_decisions #relevant_cp, global_rej
+#---------------------------------------------------------------------------------------------------#
+#-               Ancillary functions II: choice of threshold for binary segmentation               -#
+#---------------------------------------------------------------------------------------------------#
+# ----------- Not required if binary segmentation threshold is known via other methods -------------#
+
+
+
 
 

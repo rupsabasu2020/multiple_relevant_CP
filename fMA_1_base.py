@@ -1,10 +1,13 @@
 import numpy as np
 from scipy.interpolate import BSpline
+from scipy.linalg import eigh
+
+# ---- FINAL VERSION OF REQUIRED BASE FUNCTIONS (for simulations from the paper) ----------------#
 
 
-##############
-##### ------- code generates fMA(1) error process --------######
-
+#---------------------------------------------------------------------------------------------------#
+#--                          Generate data for simulations                                        --#
+#---------------------------------------------------------------------------------------------------#
 
 def genBSplineBasis(D, n , degree = 4):
     num_control_points = degree + 1   # Define the number of control points (degree + 1)
