@@ -39,7 +39,7 @@ def cusum(fdata, begin, end, N, thresh_val):  #, thresh_val, cp_list,
     if begin >= end:    # defining new l and r of the sequence from recursive binseg
         return -1
     
-    dataPoints = end - begin
+    dataPoints = end - begin   #n_i
     sValues = np.linspace(float(begin)/float(N), float(end - 1)/float(N), num=dataPoints)
     M_hat = []
     for i in range(dataPoints):  # scanning over possible values of s
@@ -94,7 +94,7 @@ def mult_test_stat(data_mat, N, cp_i):  #, thresh_val, cp_list,
     for cp_index in range(1, len(cp_i)-1):
         begin = cp_i[cp_index-1]
         end = cp_i[cp_index +1]
-        dataPoints = end - begin
+        dataPoints = end - begin   # n_i
         sValues = np.linspace(float(begin)/float(N), float(end - 1)/float(N), num=dataPoints)
         M_hat = []
         for spoints_i in range(dataPoints):  # scanning over possible values of s
@@ -188,7 +188,7 @@ def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
         #----------adjusting the data for respective cp -------------#
         fdata = fdata[cp_m1: cp_p1, :]
         mu_diff[i-1] = mu_diff[i-1].reshape((1, 100))
-        fdata[cp- cp_m1:, :] -= mu_diff[i-1]
+        fdata[cp:, :] -= mu_diff[i-1]
         rv = np.random.normal(0, 1, N*M)
         epsilon_hat = fdata - l*np.mean(fdata, axis = 0)   # first term from paper from the bootstrap process
         epsilon_star = []
