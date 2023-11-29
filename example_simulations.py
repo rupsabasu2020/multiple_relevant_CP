@@ -25,7 +25,7 @@ decimal.getcontext().prec = 10
 
 num_curves = 600
 time_points = np.linspace(0, 2*np.pi, num=100)  # Create 100 time points for each curve
-true_cp = [300]
+true_cp = [150, 400]
 #binseg_thresh = 4
 rel_size = [15]
 alpha = 0.1    # parameter, level of the test

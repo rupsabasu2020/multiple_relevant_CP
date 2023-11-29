@@ -190,11 +190,11 @@ def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
         mu_diff[i-1] = mu_diff[i-1].reshape((1, 100))
         fdata[cp:, :] -= mu_diff[i-1]
         rv = np.random.normal(0, 1, N*M)
-        epsilon_hat = fdata - l*np.mean(fdata, axis = 0)   # first term from paper from the bootstrap process
+        epsilon_hat = fdata    # first term from paper from the bootstrap process
         epsilon_star = []
         """ l is bandwidth parameter, rv is multiplier random variable ! """
         for k in range(1, n_i-l+1):
-            quant  = (1/np.sqrt(l))*np.sum(epsilon_hat[k: (k+l), :], axis = 0)   # second factor need not be included... 
+            quant  = (1/np.sqrt(l))*(np.sum(epsilon_hat[k: (k+l), :], axis = 0)- l*np.mean(fdata, axis = 0))  # second factor need not be included... 
             quant = quant*rv[k]    
             epsilon_star.append(quant)      # sequentially appending from for loop
 
