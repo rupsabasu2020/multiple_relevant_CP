@@ -321,7 +321,7 @@ def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, block
 #---------------------------------------------------------------------------------------------------#
 
 
-def multi_relevant_changes(data_mat, Delta, level_alpha, repeats, const_c, factor =1, min_dist_cp =20,   block_length_boot= None,   M = 2):
+def multi_relevant_changes(data_mat, Delta, level_alpha, repeats, const_c, factor =1, min_dist_cp =20,   block_length_boot= None,   M = 2, binsegThreshold = None):
     """
     Global function encompassing all the methods in the paper
     
@@ -334,9 +334,10 @@ def multi_relevant_changes(data_mat, Delta, level_alpha, repeats, const_c, facto
         -- factor : controls threshold for binary segmentation, smaller factor -->> larger threshold -->> increase factor to reduce threshold
         -- min_dist_cp: minimum distance between detected change point, can reduce unnecessary change detecting in binary segmentation
         -- block_length_boot:  length of blocks for bootstrap process, if not known, default algorithm is already included to compute
+        -- binsegThreshold : threshold for the binary segmentation algorithm. If not defined, default algorithm is included to compute this
     """
 
-    change_points  = binary_seg_init(data_mat, factor, min_distance= min_dist_cp) # using binary segmentation
+    change_points  = binary_seg_init(data_mat, factor, min_distance= min_dist_cp, thresh= binsegThreshold) # using binary segmentation
     if len(change_points)==2:
         print("Size of adjusting factor for thresholding binary segmentation is too small, choose a larger value to detect changes")
         return print("procedure stopped due to high binary segmentation threshold")
