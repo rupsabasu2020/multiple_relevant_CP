@@ -1,5 +1,4 @@
 import numpy as np
-import fMA_1_base as fMA1
 import basefuncs_multCPP as bfmcpp
 import multiprocessing as mp
 import pandas as pd
@@ -52,12 +51,12 @@ def change_point_Test(run, num_curves, time_points, change_locs,  delta_size, al
     if block_length is None:
         block_length = bfmcpp.w_funcs_q(h_val = 9, timeseries=noisy_curves, weight_function='qs')
 
-    binseg_cp  = bfmcpp.binary_seg_init(noisy_curves, factor=2)  # not using at all
-    print(binseg_cp)
+    binseg_cp  = bfmcpp.binary_seg_init(noisy_curves, factor=2, min_distance=20)  # not using at all
+
     local_decisions = []
     if len(binseg_cp) <= 5:
         #------------- change point test -------------------------------#
-        global_decisions, local_decisions = bfmcpp.reject(noisy_curves, binseg_cp, Delta= delta_size, level_alpha=alpha, repeats=boot_repeats, const_c = c_value , binseg_thresh=bin_seg_thresh, block_length_boot= block_length)
+        global_decisions, local_decisions = bfmcpp.reject(noisy_curves, binseg_cp, Delta= delta_size, level_alpha=alpha, repeats=boot_repeats, const_c = c_value, block_length_boot= block_length)
         local_decisions = local_decisions.tolist()
     return  binseg_cp, local_decisions#, global_decisions # uncomment to get global decisions
 
