@@ -52,7 +52,7 @@ def change_point_Test(run, num_curves, time_points, change_locs,  delta_size, al
     if block_length is None:
         block_length = bfmcpp.w_funcs_q(h_val = 9, timeseries=noisy_curves, weight_function='qs')
 
-    binseg_cp  = bfmcpp.binary_seg_init(noisy_curves, bin_seg_thresh)  # not using at all
+    binseg_cp  = bfmcpp.binary_seg_init(noisy_curves, factor=2)  # not using at all
     print(binseg_cp)
     local_decisions = []
     if len(binseg_cp) <= 5:

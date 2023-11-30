@@ -16,7 +16,7 @@ def U_hat(s, fdata, l, r, N):
     
     Parameters: 
         -- s: s in (l, r) and the time point under consideration
-        --fdata: functional data in matrix form with dimensions (N, 100)   # 100 can be any other value
+        -- fdata: functional data in matrix form with dimensions (N, 100)   # 100 can be any other value
         -- l: start of the sequence in (1, N)
         -- r: end of the sequence in (1, N)
         -- N: sample size of the full sequence
@@ -28,12 +28,11 @@ def cusum(fdata, begin, end, N, thresh_val):  #, thresh_val, cp_list,
     """ iteratively using the CUSUM statistic above to recover locations of changes 
 
     Parameters: 
-        --fdata:
-        --begin:
-        --end:
-        --N: 
-        --thresh_val:
-
+        -- fdata: data in matrix format
+        -- begin :starts at 0, in future segmentations begin at the previously located CP
+        -- end : starts at N, future segmentations end at previously located CP 
+        -- N: sample size of the full sequence
+        -- thresh_val: for segmenting binary segmentation 
     """
     
     if begin >= end:    # defining new l and r of the sequence from recursive binseg
@@ -54,22 +53,66 @@ def cusum(fdata, begin, end, N, thresh_val):  #, thresh_val, cp_list,
     else:
         return pos
     
-def binary_seg_init(data, thresh):
-    """Binary segmentation for change-point detection."""
+def binary_seg_init(data, factor,  min_distance, thresh = None):
+    """Binary segmentation for change-point detection (initial setup for recursive programming)
+    
+    Parameters: 
+        -- data: in matrix format
+        -- thresh: for segmenting binary segmentation 
+    """
+    # Calculate or use user-defined binseg_thresh
+    if thresh is None:
+        thresh = calculate_median_l2_norm_squared(data, factor) 
     N = len(data[:, 0])
     cp = [0, N]  # Initial interval
     #cp2 = [0, N]
-    return binary_seg_rec(data, thresh, cp, 0, N, N)
+    return binary_seg_rec(data, thresh, cp, 0, N, N, min_distance)
 
-
-def binary_seg_rec(data, thresh, cp, begin, end, N):
+def binary_seg_rec(data, thresh, cp, begin, end, N, min_distance):
+    """Recursively segmenting the data and finding change points
+    
+    Parameters: 
+        -- data : in matrix format
+        -- thresh: value for segmenting series
+        -- cp: previous change locations found
+        -- begin :starts at 0, in future segmentations begin at the previously located CP
+        -- end : starts at N, future segmentations end at previously located CP 
+        -- min_distance: minimum distance between new and existing cp_locations
+    """
     cp_location = cusum(data, begin, end, N, thresh)
     if cp_location > 0:
-        cp.append(cp_location)
-        cp.sort()
-        cp = binary_seg_rec(data, thresh, cp, begin, cp_location - 1, N)
-        cp = binary_seg_rec(data, thresh, cp, cp_location + 1, end, N)
+        # Check minimum distance
+        if all(abs(existing_cp - cp_location) >= min_distance for existing_cp in cp):
+            cp.append(cp_location)
+            cp.sort()
+        # else:
+        #     # Handle the case where the minimum distance is not satisfied
+        #     print(f"New cp_location at {cp_location} violates minimum distance requirement.")
+            
+        # Continue recursion
+        cp = binary_seg_rec(data, thresh, cp, begin, cp_location - 1, N, min_distance)
+        cp = binary_seg_rec(data, thresh, cp, cp_location + 1, end, N, min_distance)
     return cp
+
+
+
+# def binary_seg_rec(data, thresh, cp, begin, end, N):
+#     """Recursively segmenting the data and finding change points
+        # does not include minimum distance criteria of binary segmentation
+#     Parameters: 
+#         -- data : in matrix format
+#         -- thresh: value for segmenting series
+#         -- cp: previous change locations found
+#         -- begin :starts at 0, in future segmentations begin at the previously located CP
+#         -- end : starts at N, future segmentations end at previously located CP 
+#     """
+#     cp_location = cusum(data, begin, end, N, thresh)
+#     if cp_location > 0:
+#         cp.append(cp_location)
+#         cp.sort()
+#         cp = binary_seg_rec(data, thresh, cp, begin, cp_location - 1, N)
+#         cp = binary_seg_rec(data, thresh, cp, cp_location + 1, end, N)
+#     return cp
 
 
 
@@ -101,11 +144,6 @@ def mult_test_stat(data_mat, N, cp_i):  #, thresh_val, cp_list,
             U = U_hat(sValues[spoints_i], data_mat, begin, end, N)
             hat_M =  np.max(np.abs(U))  #sup over t for fixed s
             M_hat.append(hat_M) # store this for all s
-
-        #plt.plot(M_hat)
-        #plt.vlines(x = np.argmax(M_hat), ymin=0, ymax=20)
-        #plt.show()
-        # print(M_hat[cp_i[cp_index]-begin])
         test_stat_i[str(cp_i[cp_index])] = M_hat[cp_i[cp_index]-begin]#*dataPoints
     return  test_stat_i
 
@@ -116,10 +154,8 @@ def mult_test_stat(data_mat, N, cp_i):  #, thresh_val, cp_list,
 def mean_funcs(func_data, est_changepoint):
     """
     compute differences in mean before and after change
-        --
-        --
-        --
-        --
+        -- func_data: in matrix format
+        -- est_changepoint: the change locations obtained from Step 1: binary segmentation
     """
     mu_diff = []
     cp_consideration = est_changepoint[1:-1]   # removing end points i.e., 0 and n
@@ -137,11 +173,12 @@ def mean_funcs(func_data, est_changepoint):
 
 def extremal_points(mu_diff, c, n, M_hat, est_cp):
     """
-    Extremal points within the curves
-        --
-        --
-        --
-        --
+    Extremal points within the curves, these sets have to be estimated in order to get the quantiles for test decision
+        -- mu_diff: the difference in the means pre- and post- change locations (output of mean_funcs() for all change locations )
+        -- c: mathematical parameter
+        -- n : length of the full sample
+        -- M_hat : test statistic at the change locations
+        -- est_cp : all change locations obtained from Step 1: binary segmentation
     """
     c_thresh = c*np.log(n)          # within RHS of extremal points definition
     E_upper = []
@@ -160,11 +197,12 @@ def extremal_points(mu_diff, c, n, M_hat, est_cp):
 
 def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
     """
-    Bootstrapping the threshold quantiles
-        --
-        --
-        --
-        --
+    Bootstrapping the  quantiles for a decision on change locations
+        -- func_data: data in matrix format
+        -- est_cp : all change locations obtained from Step 1: binary segmentation
+        -- mu_diff: the difference in the means pre- and post- change locations (output of mean_funcs() for all change locations )
+        -- E_upper, E_lower: the upper and lower extremal sets obtained from extremal_points()
+        -- l : block length for taking data dependency into account. Automatic procedure for selection provided in reject()
     """
     N = len(func_data[:, 0])
     T_max = []
@@ -203,26 +241,6 @@ def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
         B_s = np.multiply((1/np.sqrt(n_i)), np.sum(epsilon_star[:int(cp)], axis = 0))
 
         W_hat = B_s - np.multiply((h_hat_s), B_1)#*(1/n_i)        # quantity for bootstrap repetitions ! # stilde here
-        
-        """
-        #print(int(h_hat_s*N))
-        #W_hat_rescaled = np.multiply((1/np.sqrt(n_i)), np.sum(epsilon_star[:int(h_hat_s*N)], axis = 0))-np.multiply((h_hat_s), B_1)
-
-        if len(E_plus) > 0:    
-            T_plus =  np.max(W_hat_rescaled[E_plus])  # sup over each extremal set
-        else:
-            T_plus = float("-inf")
-        
-        if len(E_minus) > 0:
-            T_minus = np.max(-W_hat_rescaled[E_minus])
-        else:
-            T_minus = float("-inf")
-        
-        W_factor_test = max(T_plus, T_minus)            # max over the two different extremals...!
-        T = W_factor_test#*(1/s_hat*(1-s_hat))    # rescaling wrong and from previous paper.... 
-        T_max.append(T)  # over which max_i will be taken    
-
-        """
         if len(E_plus) > 0:    
             T_plus =  np.max(W_hat[E_plus])  # sup over each extremal set
         else:
@@ -239,7 +257,6 @@ def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
         
     if len(T_max) > 0:
         max_value = max(T_max)
-        # Use the maximum value as needed
     else:
     # Handle the case when the sequence is empty
         max_value = 1000000
@@ -255,19 +272,16 @@ def bootstrap_func(func_data, est_cp, mu_diff, E_upper, E_lower, l, M=2):
 
 
 
-def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binseg_thresh= None, block_length_boot= None,  M = 2):
+def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, block_length_boot= None,  M = 2):
     """
-    Test procedure for multiple changes
-
-        --
-        --
+    Procedure for a decision on whether detecting change points are relevant
+    
+    Parameters:
+        -- data_mat : data in matrix format for rows- corresponding to samples and cols- corresponding to realisations of functions
+        -- change_points :
         --
         --
     """
-
-    # Calculate or use user-defined binseg_thresh
-    if binseg_thresh is None:
-        binseg_thresh = calculate_median_l2_norm_squared(data_mat)
 
     if block_length_boot is None:
         block_length_boot = w_funcs_q(h_val = 9, timeseries=data_mat, weight_function='qs')
@@ -291,12 +305,44 @@ def reject(data_mat, change_points,  Delta, level_alpha, repeats, const_c, binse
     for delta in Delta:
         rhs_1 = np.array(teststat_list)- np.multiply(h_hat_all, delta)     # coord-wise multiply
         rhs = np.multiply(np.sqrt(n_i), rhs_1)
-        print(max(rhs), quantile)
         global_rej = ((max(rhs))>= quantile)*1
         rej = (rhs>= quantile)
         rej = rej*1
         test_dec[str(delta)] = global_rej
     return test_dec, rej
+
+
+
+
+#---------------------------------------------------------------------------------------------------#
+#-               Global functions := binary segmentation + relevant change decision                -#
+#---------------------------------------------------------------------------------------------------#
+
+
+def multi_relevant_changes(data_mat, Delta, level_alpha, repeats, const_c, factor =1, min_dist_cp =20,   block_length_boot= None,   M = 2):
+    """
+    Global function encompassing all the methods in the paper
+    
+    Parameters:
+        -- data_mat : data in matrix format for rows- corresponding to samples and cols- corresponding to realisations of functions
+        -- Delta : relevant size of the change
+        -- level_alpha : (1- level_alpha) quantile used as threshold for accepting or rejecting changes as relevant changes
+        -- repeats : number of repeats of the bootstrap process
+        -- const_c : mathematical parameter for computing extremal set
+        -- factor : controls threshold for binary segmentation, smaller factor -->> larger threshold -->> increase factor to reduce threshold
+        -- min_dist_cp: minimum distance between detected change point, can reduce unnecessary change detecting in binary segmentation
+        -- block_length_boot:  length of blocks for bootstrap process, if not known, default algorithm is already included to compute
+    """
+
+    change_points  = binary_seg_init(data_mat, factor, min_distance= min_dist_cp) # using binary segmentation
+    if len(change_points)==2:
+        print("Size of adjusting factor for thresholding binary segmentation is too small, choose a larger value to detect changes")
+        return print("procedure stopped due to high binary segmentation threshold")
+    else:
+        global_decision, local_decisions = reject(data_mat, change_points, Delta, level_alpha, repeats, const_c, block_length_boot, M)
+        return global_decision, local_decisions
+
+
 
 
 
@@ -421,15 +467,21 @@ def w_funcs_q(h_val, timeseries, weight_function='qs'):
 
 def calculate_squared_l2_norm(data):
     differences = np.diff(data, axis=0)
-    squared_l2_norms = np.sum(differences**2, axis=0)/2
-    return squared_l2_norms
+    squared_l2_norms = np.linalg.norm(differences, ord= 2, axis= 1)
+    return squared_l2_norms//2     # suggested factor
 
-def calculate_median_l2_norm_squared(data):
-    n = len(data[:, 0])
+def calculate_median_l2_norm_squared(data, factor = 1):
+    """choice of optimal threshold for binary segmentation
+    
+    Parameters: 
+        -- data: in matrix format
+        -- factor: adjusting the current threshold by adjusting the factor 
+    """
+    N = len(data[:, 0])
     squared_l2_norms = calculate_squared_l2_norm(data)
     sigma_n_2 = np.median(squared_l2_norms)
-    sigma_n = sigma_n_2**(1/2)
-    thresh = sigma_n*np.sqrt(3*np.log(n))
+    sigma_n = np.sqrt(sigma_n_2)
+    thresh = sigma_n*np.sqrt(3*np.log(N))/factor
     return thresh
 
 #---------------------------------------------------------------------------------------------------#
