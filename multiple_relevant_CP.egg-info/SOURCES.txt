@@ -1,0 +1,12 @@
+LICENSE
+README.md
+setup.py
+multiple_relevant_CP/basefuncs_multCPP.py
+multiple_relevant_CP/data_example.py
+multiple_relevant_CP/example_simulations.py
+multiple_relevant_CP.egg-info/PKG-INFO
+multiple_relevant_CP.egg-info/SOURCES.txt
+multiple_relevant_CP.egg-info/dependency_links.txt
+multiple_relevant_CP.egg-info/not-zip-safe
+multiple_relevant_CP.egg-info/requires.txt
+multiple_relevant_CP.egg-info/top_level.txt

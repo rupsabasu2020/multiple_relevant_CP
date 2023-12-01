@@ -1,0 +1,8 @@
+numpy
+scipy
+matplotlib
+matplotlib_scalebar
+scipy
+pandas
+multiprocessing
+decimal
