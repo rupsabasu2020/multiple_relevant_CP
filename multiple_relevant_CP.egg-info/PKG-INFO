@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: multiple-relevant-CP
-Version: 0.0.1
+Version: 0.0.8
 Summary: A package to detect relevant changes.
 Author: Rupsa Basu
 Author-email: r.basu@utwente.nl
@@ -10,10 +10,7 @@ License-File: LICENSE
 Requires-Dist: numpy
 Requires-Dist: scipy
 Requires-Dist: matplotlib
-Requires-Dist: matplotlib_scalebar
-Requires-Dist: scipy
 Requires-Dist: pandas
-Requires-Dist: multiprocessing
 Requires-Dist: decimal
 
 Detects (1) all changes in a functional time series data (2) then filters out changes which are relevant to the research problem .

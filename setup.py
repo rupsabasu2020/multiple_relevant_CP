@@ -8,7 +8,7 @@ with open(os.path.join(ROOT, 'README.md'), encoding="utf-8") as f:
 # name is not fixed yet
 # version 0 (i.e. not ready yet)
 setup(name='multiple_relevant_CP',
-      version='0.0.2',
+      version='0.0.8',
       description='A package to detect relevant changes.',
      author='Rupsa Basu',
       author_email='r.basu@utwente.nl',
@@ -21,9 +21,7 @@ setup(name='multiple_relevant_CP',
           'numpy',
           'scipy',
           'matplotlib',
-           'scipy',
-           'pandas',
-           'multiprocessing',
-           'decimal'
+          'pandas',
+          'decimal'
       ],
       zip_safe=False)
