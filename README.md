@@ -5,4 +5,4 @@ In (1) A binary segmentation is used. This algorithm recursively looks for a cha
 
 In (2) the methods developed in the paper (https://arxiv.org/abs/2312.11108) are provided. This method uses the change locations detected in (1) and filters out a subset of changes which are relevant to the research question under study.
 
-In the folder (multiple_relevant_CP), the relevant file with all the implementation of the algorithms presented in the paper are in "basefuncs_multCPP.py"
+In the folder (multiple_relevant_CP), the relevant file with all the implementation of the algorithms presented in the paper are in "basefuncs_multCPP.py", seperated via necessary comments for the various implementations. An example for running the code, either simulations or for a specific dataset, may be found in "example_simulations.py" and "data_example.py" respectively. 
